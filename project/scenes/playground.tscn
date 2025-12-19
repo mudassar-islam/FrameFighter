@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://m5gmdljnywwj"]
+
+[ext_resource type="Script" uid="uid://ds7545maafhe8" path="res://scenes/playground.gd" id="1_hddm4"]
+[ext_resource type="FighterActionMap" uid="uid://d2kfojuwd2c5a" path="res://resources/fighter_action_map.tres" id="2_qchbg"]
+
+[node name="Playground" type="Node2D"]
+script = ExtResource("1_hddm4")
+
+[node name="FighterInput" type="FighterInput" parent="."]
+action_map = ExtResource("2_qchbg")

@@ -1,0 +1,41 @@
+[gd_resource type="FighterActionMap" load_steps=9 format=3 uid="uid://d2kfojuwd2c5a"]
+
+[sub_resource type="FighterAction" id="FighterAction_o2muk"]
+name = "lp"
+input_action = "a_lp"
+
+[sub_resource type="FighterAction" id="FighterAction_142c4"]
+name = "mp"
+input_action = "a_mp"
+
+[sub_resource type="FighterAction" id="FighterAction_jmbj4"]
+name = "hp"
+input_action = "a_hp"
+
+[sub_resource type="FighterAction" id="FighterAction_sbw4s"]
+name = "lk"
+input_action = "a_lk"
+
+[sub_resource type="FighterAction" id="FighterAction_t2hnm"]
+name = "mk"
+input_action = "a_mk"
+
+[sub_resource type="FighterAction" id="FighterAction_kwhm1"]
+name = "hk"
+input_action = "a_hk"
+
+[sub_resource type="FighterCompositeAction" id="FighterCompositeAction_o2muk"]
+name = "parry"
+dependencies = Array[String](["lp", "lk"])
+
+[sub_resource type="FighterCompositeAction" id="FighterCompositeAction_142c4"]
+name = "ex_p"
+dependencies = Array[String](["lp", "mp", "hp"])
+
+[resource]
+up = "m_up"
+down = "m_down"
+forward = "m_forward"
+back = "m_backward"
+actions = Array[FighterAction]([SubResource("FighterAction_o2muk"), SubResource("FighterAction_142c4"), SubResource("FighterAction_jmbj4"), SubResource("FighterAction_sbw4s"), SubResource("FighterAction_t2hnm"), SubResource("FighterAction_kwhm1")])
+composite_actions = Array[FighterCompositeAction]([SubResource("FighterCompositeAction_o2muk"), SubResource("FighterCompositeAction_142c4")])
