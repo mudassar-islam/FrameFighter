@@ -1,5 +1,6 @@
 use std::{collections::HashMap};
 use godot::{classes::Input, global::{godot_error}, obj::Singleton};
+use indexmap::IndexMap;
 
 use crate::addons::frame_fighter::FrameFighter;
 
@@ -54,11 +55,10 @@ pub struct ActionController {
     back_input_action: String,
     forward_input_action: String,
 
-    actions: HashMap<String, Action>,
+    actions: IndexMap<String, Action>,
     charge: HashMap<String, i32>,
     opposites: HashMap<String, String>,
     dependency_input: HashMap<String, bool>,
-    actions_order: Vec<String>,
 
     can_charge: bool,
 
@@ -106,8 +106,6 @@ impl ActionController {
         if charge_type != FrameFighter::CHARGE_NONE {
             self.create_charge_key(name, 0);
         }
-
-        self.actions_order.push(name.to_string());
     }
 
     pub fn add_composite(&mut self, name: &str, dependencies: Vec<&str>, charge_type: i32, require_all: bool) {
@@ -132,8 +130,6 @@ impl ActionController {
         if charge_type != FrameFighter::CHARGE_NONE {
             self.create_charge_key(name, 0);
         }
-
-        self.actions_order.push(name.to_string());
     }
 
     pub fn create_charge_key(&mut self, name: &str, frames: i32) {
@@ -148,22 +144,24 @@ impl ActionController {
         let forward_action = self.actions.get_mut("forward");
         match forward_action {
             Some(forward_action) => {
-                if side == FrameFighter::PLAYER_ONE {
-                    forward_action.input_action = self.forward_input_action.clone();
-                } else {
-                    forward_action.input_action = self.back_input_action.clone();
-                }
+                forward_action.input_action =
+                    if side == FrameFighter::PLAYER_TWO {
+                        self.back_input_action.clone()
+                    } else {
+                        self.forward_input_action.clone()
+                    };
             },
             _ => godot_error!("Forward action not set.")
         }
         let back_action = self.actions.get_mut("back");
         match back_action {
             Some(back_action) => {
-                if side == FrameFighter::PLAYER_ONE {
-                    back_action.input_action = self.back_input_action.clone();
-                } else {
-                    back_action.input_action = self.forward_input_action.clone();
-                }
+                back_action.input_action =
+                    if side == FrameFighter::PLAYER_TWO {
+                        self.forward_input_action.clone()
+                    } else {
+                        self.back_input_action.clone()
+                    };
             },
             _ => godot_error!("Backward action not set.")
         }
@@ -172,87 +170,79 @@ impl ActionController {
     pub fn process_current_frame(&mut self) {
         let input = Input::singleton();
 
-        // Used to check if dependencies
+        // Used to look up dependencies for composite actions
         let cloned_actions = self.actions.clone();
+
+        // Actions pushed into this vec will be "released" after all iterations are complete.
         let mut released_actions = vec![];
 
-        for name in self.actions_order.iter() {
-            if let Some(action) = self.actions.get_mut(name) {
-                match action.composite {
-                    true => {
-                        let mut dependency_state = action.dependencies.iter()
-                            .map(|dependency| cloned_actions.get(dependency))
-                            .map(|sub_action|
-                                match sub_action {
-                                    Some(sub_action) => {
-                                        if let Some(&is_true) = self.dependency_input.get(&sub_action.name) && is_true {
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    },
-                                    None => false
-                                }
-                            );
+        for (_name, action) in self.actions.iter_mut() {
+            match action.composite {
+                true => {
+                    let mut dependency_state = action.dependencies.iter()
+                        .map(|dependency| if let Some(&is_true) = self.dependency_input.get(&dependency.to_string()) && is_true {
+                            true
+                        } else {
+                            false
+                        });
 
-                        action.pressed =
-                            if action.require_all {
-                                dependency_state.all(|pressed| pressed == true)
-                            } else {
-                                dependency_state.filter(|&pressed| pressed == true).count() > 1
-                            };
+                    action.pressed =
+                        if action.require_all {
+                            dependency_state.all(|pressed| pressed == true)
+                        } else {
+                            dependency_state.filter(|&pressed| pressed == true).count() > 1
+                        };
 
-                        // "release" the dependency actions in case of a diagonal because we want a single direction.
-                        if action.pressed && action.is_movement() {
-                            for dependency in action.dependencies.iter() {
-                                released_actions.push(dependency.clone());
-                            }
-                        }
-                    },
-
-                    false => {
-                        action.pressed = input.is_action_pressed(&action.input_action);
-
-                        if action.pressed && action.is_movement() {
-                            // SOCD Check
-                            let opposite = self.opposites.get(&action.name);
-
-                            match opposite {
-                                Some(opposite) => {
-                                    if let Some(opposite_action) = cloned_actions.get(opposite) && input.is_action_pressed(&opposite_action.input_action) {
-                                        action.pressed = false;
-                                        released_actions.push(opposite_action.name.clone());
-                                    }
-                                },
-
-                                _ => godot_error!("Opposite direction for cardinal {} not found.", &action.name)
-                            }
-                        }
-
-                        if action.is_dependency {
-                            self.dependency_input.insert(action.name.clone(), action.pressed);
+                    // "release" the dependency actions in case of a diagonal because we want a single direction.
+                    if action.pressed && action.is_movement() {
+                        for dependency in action.dependencies.iter() {
+                            released_actions.push(dependency.clone());
                         }
                     }
-                }
+                },
 
-                // "charge" a move when the action is pressed and "can_charge"
-                // "can_charge" can be modified by the user to disallow charging mid-air for example.
-                if action.charge_type != FrameFighter::CHARGE_NONE {
-                    let charge = self.charge.get_mut(&action.name);
+                false => {
+                    action.pressed = input.is_action_pressed(&action.input_action);
 
-                    match charge {
-                        Some(frames) => {
-                            if action.pressed && self.can_charge {
-                                *frames = (*frames + 1).clamp(0, 9999);
-                            } else if action.charge_type == FrameFighter::CHARGE_TICK {
-                                *frames = (*frames - 1).clamp(0, 9999);
-                            } else {
-                                *frames = 0;
-                            }
-                        },
-                        None => panic!("Charge Key for {} not found.", &action.name)
-                    };
+                    if action.pressed && action.is_movement() {
+                        // SOCD Check
+                        let opposite = self.opposites.get(&action.name);
+
+                        match opposite {
+                            Some(opposite) => {
+                                if let Some(opposite_action) = cloned_actions.get(opposite) && input.is_action_pressed(&opposite_action.input_action) {
+                                    action.pressed = false;
+                                    released_actions.push(opposite_action.name.clone());
+                                }
+                            },
+
+                            _ => godot_error!("Opposite direction for cardinal {} not found.", &action.name)
+                        }
+                    }
+
+                    if action.is_dependency {
+                        self.dependency_input.insert(action.name.clone(), action.pressed);
+                    }
                 }
+            }
+
+            // "charge" a move when the action is pressed and "can_charge"
+            // "can_charge" can be modified by the user to disallow charging mid-air for example.
+            if action.charge_type != FrameFighter::CHARGE_NONE {
+                let charge = self.charge.get_mut(&action.name);
+
+                match charge {
+                    Some(frames) => {
+                        if action.pressed && self.can_charge {
+                            *frames = (*frames + 1).clamp(0, 9999);
+                        } else if action.charge_type == FrameFighter::CHARGE_TICK {
+                            *frames = (*frames - 1).clamp(0, 9999);
+                        } else {
+                            *frames = 0;
+                        }
+                    },
+                    None => panic!("Charge Key for {} not found.", &action.name)
+                };
             }
         }
 
@@ -297,11 +287,10 @@ impl Default for ActionController {
             forward_input_action: "m_forward".to_string(),
             can_charge: false,
 
-            actions: HashMap::new(),
+            actions: IndexMap::new(),
             charge: HashMap::new(),
             opposites: HashMap::new(),
             dependency_input: HashMap::new(),
-            actions_order: vec![],
 
             pressed_actions_movement: "neutral".to_string(),
             pressed_actions_basic: vec![],

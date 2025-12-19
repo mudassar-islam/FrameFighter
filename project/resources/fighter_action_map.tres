@@ -36,6 +36,6 @@ dependencies = Array[String](["lp", "mp", "hp"])
 up = "m_up"
 down = "m_down"
 forward = "m_forward"
-back = "m_backward"
+back = "m_back"
 actions = Array[FighterAction]([SubResource("FighterAction_o2muk"), SubResource("FighterAction_142c4"), SubResource("FighterAction_jmbj4"), SubResource("FighterAction_sbw4s"), SubResource("FighterAction_t2hnm"), SubResource("FighterAction_kwhm1")])
 composite_actions = Array[FighterCompositeAction]([SubResource("FighterCompositeAction_o2muk"), SubResource("FighterCompositeAction_142c4")])

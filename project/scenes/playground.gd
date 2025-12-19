@@ -12,9 +12,5 @@ func _ready() -> void:
 var accum = 0;
 
 func _physics_process(delta: float) -> void:
-	accum += delta
-	
-	if accum > 0.75:
-		accum = 0
-		fighterInput.tick()
+	fighterInput.tick()
 	pass
