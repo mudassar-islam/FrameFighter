@@ -1,5 +1,5 @@
 use std::{collections::HashMap};
-use godot::{classes::Input, global::{godot_error}, obj::Singleton};
+use godot::{classes::Input, global::{godot_error, godot_print}, obj::Singleton};
 use indexmap::IndexMap;
 
 use crate::addons::frame_fighter::FrameFighter;
@@ -52,12 +52,9 @@ impl Action {
 }
 
 pub struct ActionController {
-    back_input_action: String,
-    forward_input_action: String,
-
     actions: IndexMap<String, Action>,
     charge: HashMap<String, i32>,
-    opposites: HashMap<String, String>,
+    opposites: HashMap<String, (String, String)>,
     dependency_input: HashMap<String, bool>,
 
     can_charge: bool,
@@ -68,29 +65,31 @@ pub struct ActionController {
 }
 
 impl ActionController {
-    pub fn bind_directions(&mut self, up: String, down: String, forward: String, backward: String, charge_type: i32) {
+    pub fn bind_directions(&mut self, up: String, down: String, forward: String, back: String, charge_type: i32) {
+        // Basic actions for movement. Can all be charged.
         self.add("up", &up, charge_type);
         self.add("down", &down, charge_type);
         self.add("forward", &forward, charge_type);
-        self.add("back", &backward, charge_type);
+        self.add("back", &back, charge_type);
 
+        // Composite actions for diagonal movement. Cannot be charged and require all dependencies to be pressed
         self.add_composite("up_forward", vec![ "up", "forward" ], FrameFighter::CHARGE_NONE, true);
         self.add_composite("down_forward", vec![ "down", "forward" ], FrameFighter::CHARGE_NONE, true);
         self.add_composite("up_back", vec![ "up", "back" ], FrameFighter::CHARGE_NONE, true);
         self.add_composite("down_back", vec![ "down", "back" ], FrameFighter::CHARGE_NONE, true);
 
+        // Charge keys only for directions.
         self.create_charge_key("up", 0);
         self.create_charge_key("down", 0);
         self.create_charge_key("back", 0);
         self.create_charge_key("forward", 0);
 
-        self.opposites.insert("up".to_string(), "down".to_string());
-        self.opposites.insert("down".to_string(), "up".to_string());
-        self.opposites.insert("back".to_string(), "forward".to_string());
-        self.opposites.insert("forward".to_string(), "back".to_string());
-
-        self.back_input_action = backward.clone();
-        self.forward_input_action = forward.clone();
+        // A hashmap for the opposite action and opposite input action for every direction.
+        // Required for SOCD checks.
+        self.opposites.insert("up".to_string(), ("down".to_string(), down.to_string()));
+        self.opposites.insert("down".to_string(), ("up".to_string(), up.to_string()));
+        self.opposites.insert("back".to_string(), ("forward".to_string(), forward.to_string()));
+        self.opposites.insert("forward".to_string(), ("back".to_string(), back.to_string()));
     }
 
     pub fn add(&mut self, name: &str, input_action: &str, charge_type: i32) {
@@ -141,37 +140,29 @@ impl ActionController {
     }
 
     pub fn handle_side(&mut self, side: i32) {
-        let forward_action = self.actions.get_mut("forward");
-        match forward_action {
-            Some(forward_action) => {
-                forward_action.input_action =
-                    if side == FrameFighter::PLAYER_TWO {
-                        self.back_input_action.clone()
-                    } else {
-                        self.forward_input_action.clone()
-                    };
-            },
-            _ => godot_error!("Forward action not set.")
-        }
-        let back_action = self.actions.get_mut("back");
-        match back_action {
-            Some(back_action) => {
-                back_action.input_action =
-                    if side == FrameFighter::PLAYER_TWO {
-                        self.forward_input_action.clone()
-                    } else {
-                        self.back_input_action.clone()
-                    };
-            },
-            _ => godot_error!("Backward action not set.")
+        if let Some(forward) = self.opposites.get("back") && let Some(back) = self.opposites.get("forward") {
+            godot_print!("{} {}", &forward.1, &back.1);
+
+            if let Some(forward_action) = self.actions.get_mut("forward") {
+                forward_action.input_action = if side == FrameFighter::PLAYER_ONE {
+                    forward.1.to_string()
+                } else {
+                    back.1.to_string()
+                };
+            }
+
+            if let Some(back_action) = self.actions.get_mut("back") {
+                back_action.input_action = if side == FrameFighter::PLAYER_ONE {
+                    back.1.to_string()
+                } else {
+                    forward.1.to_string()
+                };
+            }
         }
     }
 
     pub fn process_current_frame(&mut self) {
         let input = Input::singleton();
-
-        // Used to look up dependencies for composite actions
-        let cloned_actions = self.actions.clone();
 
         // Actions pushed into this vec will be "released" after all iterations are complete.
         let mut released_actions = vec![];
@@ -205,14 +196,11 @@ impl ActionController {
                     action.pressed = input.is_action_pressed(&action.input_action);
 
                     if action.pressed && action.is_movement() {
-                        // SOCD Check
-                        let opposite = self.opposites.get(&action.name);
-
-                        match opposite {
-                            Some(opposite) => {
-                                if let Some(opposite_action) = cloned_actions.get(opposite) && input.is_action_pressed(&opposite_action.input_action) {
+                        match self.opposites.get(&action.name) {
+                            Some((opposite_action, opposite_input)) => {
+                                if input.is_action_pressed(opposite_input) {
                                     action.pressed = false;
-                                    released_actions.push(opposite_action.name.clone());
+                                    released_actions.push(opposite_action.clone());
                                 }
                             },
 
@@ -283,8 +271,6 @@ impl ActionController {
 impl Default for ActionController {
     fn default() -> Self {
         Self {
-            back_input_action: "m_back".to_string(),
-            forward_input_action: "m_forward".to_string(),
             can_charge: false,
 
             actions: IndexMap::new(),
