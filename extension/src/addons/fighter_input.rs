@@ -79,7 +79,10 @@ impl FighterInput {
 
                 for action in action_map.actions.iter_shared() {
                     let action = action.bind();
-                    self.action_controller.add(&action.name.to_string(), &action.input_action.to_string(), action.charge_type);
+                    self.action_controller.add(action.name.to_string(), action.input_action.to_string(), action.charge_type);
+                    if action.charge_type != FrameFighter::CHARGE_NONE {
+                        self.action_controller.create_charge_key(action.name.to_string());
+                    }
                 }
 
                 for action in action_map.composite_actions.iter_shared() {
@@ -92,12 +95,18 @@ impl FighterInput {
                     }
 
                     self.action_controller.add_composite(
-                        &action.name.to_string(),
+                        action.name.to_string(),
                         dependencies.iter().map(|s| s.as_str()).collect(),
                         action.charge_type,
                         action.require_all
                     );
+
+                    if action.charge_type != FrameFighter::CHARGE_NONE {
+                        self.action_controller.create_charge_key(action.name.to_string());
+                    }
                 }
+
+                self.action_controller.build_dependency_map();
             },
 
             None => panic!("Fighter Action Map not found.")

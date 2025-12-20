@@ -4,7 +4,7 @@
 
 An input processor for fighting games in the [Godot Game Engine](https://godotengine.org/) that handles input buffers, input histories, sequence matching with per-move customization, side switching & charge moves. Made in Rust using GDExtension and [godot-rust](https://godot-rust.github.io/).
 
-## Features
+## Feature Status
 
 - [x] Input processing based on a user-defined ActionMap & MoveList
 - [x] Basic Actions i.e. buttons on an arcade stick.

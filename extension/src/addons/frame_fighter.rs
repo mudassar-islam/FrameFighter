@@ -36,4 +36,13 @@ impl FrameFighter {
     pub const DIAGONALS_OPTIONAL: i32 = 2;
     #[constant]
     pub const NEUTRALS_REQUIRED: i32 = 3;
+
+    pub fn is_movement(name: &str) -> bool {
+        matches!(
+            name,
+            "up" | "down" | "back" | "forward"
+                | "up_forward" | "up_back"
+                | "down_forward" | "down_back"
+        )
+    }
 }
