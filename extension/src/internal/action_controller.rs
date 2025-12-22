@@ -46,13 +46,31 @@ impl Action {
     }
 }
 
+#[derive(Default)]
+pub struct FrameInputState {
+    pub movement: String,
+    pub basic_actions: Vec<String>,
+    pub composite_actions: Vec<String>,
+    pub charge: HashMap<String, i32>,
+}
+
+impl FrameInputState {
+    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, charge: HashMap<String, i32>) -> Self {
+        Self {
+            movement: movement.into(),
+            basic_actions: basic_actions.into_iter().map(|a| a.into()).collect(),
+            composite_actions: composite_actions.into_iter().map(|a| a.into()).collect(),
+            charge
+        }
+    }
+}
+
 pub struct ActionController {
     side: i32,
     actions: IndexMap<String, Action>,
     charge: HashMap<String, i32>,
-    opposites: HashMap<String, (String, String)>,
+    opposites: HashMap<String, (String, String, String)>,
     dependency_input: HashMap<String, bool>,
-
     can_charge: bool
 }
 
@@ -93,10 +111,10 @@ impl ActionController {
 
         // A hashmap for the opposite action and opposite input action for every direction.
         // Required for SOCD checks.
-        self.build_opposite_tuple("up", "down", &down);
-        self.build_opposite_tuple("down", "up", &up);
-        self.build_opposite_tuple("back", "forward", &forward);
-        self.build_opposite_tuple("forward", "back", &back);
+        self.build_opposite_map("up", "down", &down, &down);
+        self.build_opposite_map("down", "up", &up, &up);
+        self.build_opposite_map("back", "forward", &forward, &forward);
+        self.build_opposite_map("forward", "back", &back, &back);
     }
 
     pub fn add(&mut self, name: impl Into<String>, input_action: impl Into<String>, charge_type: i32) {
@@ -124,8 +142,8 @@ impl ActionController {
         self.charge.insert(name.into(), 0);
     }
 
-    pub fn build_opposite_tuple(&mut self, name: impl Into<String>, opposite: impl Into<String>, opposite_input: impl Into<String>) {
-        self.opposites.insert(name.into(), (opposite.into(), opposite_input.into()));
+    pub fn build_opposite_map(&mut self, name: impl Into<String>, opposite: impl Into<String>, current_input: impl Into<String>, original_input: impl Into<String>) {
+        self.opposites.insert(name.into(), (opposite.into(), current_input.into(), original_input.into()));
     }
 
     pub fn build_dependency_map(&mut self) {
@@ -150,55 +168,37 @@ impl ActionController {
         self.can_charge = can_charge;
     }
 
-    // This is a terrible method :)
-    // todo: Revamp how "opposites" are handled to prevent this monstrosity.
+    // I don't like this method.
+    // Will possibly revamp how opposites are handled to improve this.
     pub fn handle_side(&mut self, side: i32) {
         if side == self.side {
             return;
         }
 
-        return;
+        self.side = side;
 
-        /* self.side = side;
+        let opposites = self.opposites.get_disjoint_mut(["forward", "back"]);
+        let actions = self.actions.get_disjoint_mut(["forward", "back"]);
 
-        let original_back = self.opposites.get("back").map(|x| x.1.clone());
-        let original_forward = self.opposites.get("forward").map(|x| x.1.clone());
+        if let [Some(forward), Some(back)] = actions
+            && let [Some(forward_opp), Some(back_opp)] = opposites
+            && let ActionType::Basic { input_action: forward_input, .. } = &mut forward.action_type
+            && let ActionType::Basic { input_action: back_input, .. } = &mut back.action_type {
 
-        if let (Some(back_input), Some(forward_input)) = (original_back, original_forward) {
-            if side == FrameFighter::PLAYER_ONE {
-                // Forward uses back, back uses forward
-                if let Some(action) = self.actions.get_mut("forward") {
-                    action.input_action = back_input;
+            let (_, forward_current, forward_original) = back_opp;
+            let (_, back_current, back_original) = forward_opp;
 
-                    if let Some(opp) = self.opposites.get_mut("back") {
-                        opp.1 = action.input_action.clone();
-                    }
-                }
-                if let Some(action) = self.actions.get_mut("back") {
-                    action.input_action = forward_input;
-
-                    if let Some(opp) = self.opposites.get_mut("forward") {
-                        opp.1 = action.input_action.clone();
-                    }
-                }
+            if self.side == FrameFighter::PLAYER_ONE {
+                *forward_current = forward_original.clone();
+                *back_current = back_original.clone();
             } else {
-                // Swap: forward uses forward, back uses back, but opposites swap
-                if let Some(action) = self.actions.get_mut("forward") {
-                    action.input_action = forward_input;
-
-                    if let Some(opp) = self.opposites.get_mut("back") {
-                        opp.1 = action.input_action.clone();
-                    }
-                }
-                if let Some(action) = self.actions.get_mut("back") {
-                    action.input_action = back_input;
-
-                    if let Some(opp) = self.opposites.get_mut("forward") {
-                        opp.1 = action.input_action.clone();
-                    }
-                }
+                *forward_current = back_original.clone();
+                *back_current = forward_original.clone();
             }
-        } */
+
+            *forward_input = forward_current.clone();
+            *back_input = back_current.clone();
+        }
     }
 
     pub fn process_current_frame(&mut self) {
@@ -206,8 +206,9 @@ impl ActionController {
 
         for (name, action) in self.actions.iter_mut() {
             if let ActionType::Composite { dependencies, require_all } = &action.action_type {
-                let mut dependency_state = dependencies.iter()
-                    .map(|dependency| if let Some(&is_true) = self.dependency_input.get(dependency) && is_true { true } else { false });
+                let mut dependency_state = dependencies.iter().map(|dependency|
+                    self.dependency_input.get(dependency) == Some(&true)
+                );
 
                 action.pressed =
                     if *require_all {
@@ -215,18 +216,13 @@ impl ActionController {
                     } else {
                         dependency_state.filter(|&pressed| pressed == true).count() > 1
                     };
+
             } else if let ActionType::Basic { input_action, is_dependency } = &action.action_type {
                 action.pressed = input.is_action_pressed(input_action);
 
-                if action.pressed && FrameFighter::is_movement(name) {
-                    match self.opposites.get(name) {
-                        Some((_, opposite_input)) => {
-                            if input.is_action_pressed(opposite_input) {
-                                action.pressed = false;
-                            }
-                        },
-
-                        _ => godot_error!("Opposite direction for cardinal {} not found.", name)
+                if action.pressed && FrameFighter::is_movement(name) && let Some((_, opposite_input, _)) = self.opposites.get(name) {
+                    if input.is_action_pressed(opposite_input) {
+                        action.pressed = false;
                     }
                 }
 
@@ -250,7 +246,7 @@ impl ActionController {
                             *frames = 0;
                         }
                     },
-                    None => panic!("Charge Key for {} not found.", name)
+                    None => godot_error!("Charge Key for {} not found.", name)
                 };
             }
         }
@@ -274,24 +270,5 @@ impl ActionController {
         }
 
         FrameInputState::new(movement, basic, composite, self.charge.clone())
-    }
-}
-
-#[derive(Default)]
-pub struct FrameInputState {
-    pub movement: String,
-    pub basic_actions: Vec<String>,
-    pub composite_actions: Vec<String>,
-    pub charge: HashMap<String, i32>,
-}
-
-impl FrameInputState {
-    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, charge: HashMap<String, i32>) -> Self {
-        Self {
-            movement: movement.into(),
-            basic_actions: basic_actions.into_iter().map(|a| a.into()).collect(),
-            composite_actions: composite_actions.into_iter().map(|a| a.into()).collect(),
-            charge
-        }
     }
 }
