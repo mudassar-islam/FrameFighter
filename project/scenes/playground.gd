@@ -9,8 +9,15 @@ func _ready() -> void:
 	
 	pass # Replace with function body.
 
-var accum = 0;
+# var accum = 0;
 
-func _physics_process(delta: float) -> void:
-	fighterInput.tick()
+func _physics_process(_delta: float) -> void:
+	#accum += delta;
+	
+	#if accum > 1:
+		#accum = 0
+		#fighterInput.tick()
+	
+	fighterInput.process()
+	
 	pass

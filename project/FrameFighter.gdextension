@@ -13,3 +13,8 @@ macos.debug =            "res://../extension/target/debug/libframe_fighter.dylib
 macos.release =          "res://../extension/target/release/libframe_fighter.dylib"
 macos.debug.arm64 =      "res://../extension/target/debug/libframe_fighter.dylib"
 macos.release.arm64 =    "res://../extension/target/release/libframe_fighter.dylib"
+
+[icons]
+FighterInput = "res://assets/fighter_input_node.png"
+FighterActionMap = "res://assets/action_map_resource.png"
+FighterMoveList = "res://assets/move_list_resource.png"

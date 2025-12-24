@@ -7,19 +7,19 @@ use crate::internal::action_controller::{ActionController, FrameInputState};
 
 #[derive(GodotClass)]
 #[class(tool, init, base=Node)]
+/// A node for fighting game input processing. Evaluates input, tracks input history, and compares input to a move-list to resolve valid moves.
+///
+/// **Note:** A [FighterActionMap] & [FighterMoveList] resource is required for basic function.
 struct FighterInput {
-    pub frame_input_state: FrameInputState,
-
-    side: i32,
-    can_charge: bool,
-    action_controller: ActionController,
-
-    /* Resources for configuration, Exposed to the editor */
     #[export]
     action_map: Option<Gd<FighterActionMap>>,
     #[export]
     move_list: Option<Gd<FighterMoveList>>,
-    /* --- */
+
+    frame_input_state: FrameInputState,
+    side: i32,
+    can_charge: bool,
+    action_controller: ActionController,
 
     base: Base<Node>
 }
@@ -33,18 +33,21 @@ impl INode for FighterInput {
 
 #[godot_api]
 impl FighterInput {
+    /// Set the player side to Player 1 or Player 2. Inverts the forward & back actions for opposing sides.
     #[func]
     pub fn set_side(&mut self, side: i32) {
         self.side = side;
     }
 
+    /// Set whether actions can be charged or not. For example, actions should be charged while on the ground but not in the air.
     #[func]
     pub fn should_charge(&mut self, can_charge: bool) {
         self.can_charge = can_charge;
     }
 
+    /// Evaluates the current frame. This method must be called before reading the Input History, Actions Map or Matched moves.
     #[func]
-    pub fn tick(&mut self) {
+    pub fn process(&mut self) {
         self.action_controller.handle_side(self.side);
         self.action_controller.should_charge(self.can_charge);
         self.action_controller.process_current_frame();
@@ -53,11 +56,13 @@ impl FighterInput {
         self.log_input_state();
     }
 
+    /// Get the input history for display. The input history is an array that contains active actions and pressed for duration in ticks. Ordered by most recent entry to oldest entry.
     #[func]
     pub fn get_history() -> bool {
         true
     }
 
+    /// Get a dictionary of all registered actions alongside their input state.
     #[func]
     pub fn get_actions() -> bool {
         true
