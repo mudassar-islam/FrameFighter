@@ -46,20 +46,22 @@ impl Action {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FrameInputState {
     pub movement: String,
     pub basic_actions: Vec<String>,
     pub composite_actions: Vec<String>,
-    pub charge: HashMap<String, i32>,
+    pub all_actions: String,
+    pub charge: HashMap<String, u32>,
 }
 
 impl FrameInputState {
-    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, charge: HashMap<String, i32>) -> Self {
+    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, all_actions: impl Into<String>, charge: HashMap<String, u32>) -> Self {
         Self {
             movement: movement.into(),
             basic_actions: basic_actions.into_iter().map(|a| a.into()).collect(),
             composite_actions: composite_actions.into_iter().map(|a| a.into()).collect(),
+            all_actions: all_actions.into(),
             charge
         }
     }
@@ -68,7 +70,7 @@ impl FrameInputState {
 pub struct ActionController {
     side: i32,
     actions: IndexMap<String, Action>,
-    charge: HashMap<String, i32>,
+    charge: HashMap<String, u32>,
     opposites: HashMap<String, (String, String, String)>,
     dependency_input: HashMap<String, bool>,
     can_charge: bool
@@ -256,19 +258,23 @@ impl ActionController {
         let mut movement = "neutral";
         let mut basic: Vec<&str> = Vec::new();
         let mut composite: Vec<&str> = Vec::new();
+        let mut all: String = "".to_string();
 
         for (name, action) in &self.actions {
             if action.pressed {
                 if FrameFighter::is_movement(name.as_ref()) {
                     movement = &name;
+                    all += &name;
                 } else if let ActionType::Composite { .. } = action.action_type {
                     composite.push(&name);
+                    all += &name;
                 } else {
                     basic.push(&name);
+                    all += &name;
                 }
             }
         }
 
-        FrameInputState::new(movement, basic, composite, self.charge.clone())
+        FrameInputState::new(movement, basic, composite, all, self.charge.clone())
     }
 }

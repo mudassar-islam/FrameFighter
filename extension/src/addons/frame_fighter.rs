@@ -1,5 +1,6 @@
 use godot::prelude::*;
 
+/// Includes some constants for use with the [FighterInput] node.
 #[derive(GodotClass)]
 #[class(tool, init, base=Object)]
 pub struct FrameFighter {
@@ -8,34 +9,25 @@ pub struct FrameFighter {
 
 #[godot_api]
 impl FrameFighter {
+    /// Will not be charged.
     #[constant]
     pub const CHARGE_NONE: i32 = 0;
+
+    /// Charge is increased once per tick, reset to zero when released.
     #[constant]
     pub const CHARGE_IMMEDIATE: i32 = 1;
 
+    /// Charge is increased once per tick, reduced once per tick when released.
     #[constant]
     pub const CHARGE_TICK: i32 = 2;
 
+    /// Player 1 Side. Default side. Sequences are defined within the context of Player 1.
     #[constant]
     pub const PLAYER_ONE: i32 = 1;
 
+    /// Player 2 Side. Forward & Back are inverted.
     #[constant]
     pub const PLAYER_TWO: i32 = 2;
-
-    #[constant]
-    pub const ACCURACY_PERFECT: i32 = 0;
-
-    #[constant]
-    const ACCURACY_LENIENT: i32 = 1;
-
-    #[constant]
-    pub const PERFECT_INPUT: i32 = 0;
-    #[constant]
-    pub const LENIENT_FINAL_INPUT: i32 = 1;
-    #[constant]
-    pub const DIAGONALS_OPTIONAL: i32 = 2;
-    #[constant]
-    pub const NEUTRALS_REQUIRED: i32 = 3;
 
     pub fn is_movement(name: &str) -> bool {
         matches!(

@@ -12,12 +12,13 @@ func _ready() -> void:
 # var accum = 0;
 
 func _physics_process(_delta: float) -> void:
-	#accum += delta;
-	
-	#if accum > 1:
-		#accum = 0
-		#fighterInput.tick()
-	
 	fighterInput.process()
+	
+	var actions = fighterInput.pressed_actions()
+	
+	print("\n\n")
+	print("Frames: " + str(actions.frames))
+	print("Movement: " + actions.movement)
+	print(actions.charge)
 	
 	pass
