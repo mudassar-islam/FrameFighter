@@ -13,10 +13,15 @@ use crate::internal::input_history::InputHistory;
 ///
 /// **Note:** A [FighterActionMap] & [FighterMoveList] resource is required for basic function.
 struct FighterInput {
-    /// Set the amount of entries the input history will hold. This number does determine the largest possible sequence that can be matched. The default value of 20 is recommended.
+    /// Set the amount of entries the input history will hold. This number determines the largest possible sequence that can be matched. The default value of 20 should be enough for most use-cases.
     #[export]
     #[init(val = 20)]
     history_size: u32,
+
+    /// Set the amount of frames the input history ticks up-to. The default value of 99 should be enough for most use-cases.
+    #[export]
+    #[init(val = 99)]
+    history_frames: u32,
 
     #[export]
     action_map: Option<Gd<FighterActionMap>>,
@@ -40,11 +45,19 @@ impl INode for FighterInput {
             Err(_) => {
                 self.input_history.set_size(20);
 
-                godot_error!("History size could not be converted into usize. Using the default value of 20.");
+                godot_error!("History size could not be converted into usize in the FighterInput node. Using the default value of 20.");
             }
         }
 
-        self.input_history.set_max_frames(99);
+        match u32::try_from(self.history_frames) {
+            Ok(size) => self.input_history.set_max_frames(size),
+            Err(_) => {
+                self.input_history.set_max_frames(99);
+
+                godot_error!("History frames could not be converted into u32 in the FighterInput node. Using the default value of 99.");
+            }
+        }
+
         self.parse_action_map(); // Bind actions locally from the Fighter Action Map resource.
     }
 }
@@ -65,7 +78,7 @@ impl FighterInput {
 
     /// Evaluates the current frame. This method must be called before reading the Input History, Actions Map or Matched moves.
     #[func]
-    pub fn process(&mut self) {
+    pub fn process_frame(&mut self) {
         self.action_controller.handle_side(self.side);
         self.action_controller.should_charge(self.can_charge);
         self.action_controller.process_current_frame();
@@ -74,7 +87,7 @@ impl FighterInput {
 
         self.input_history.add(&self.frame_input_state);
 
-        // self.log_input_state();
+        self.log_input_state();
     }
 
     /// Get the input history for display. The input history is an array that contains active actions and pressed for duration in frames. Ordered by most recent entry to oldest entry.
@@ -83,7 +96,7 @@ impl FighterInput {
         self.input_history.to_godot()
     }
 
-    /// Get a single [FighterHistoryItem] for the current frame.
+    /// InputHistoryItem for the current frame.
     #[func]
     pub fn pressed_actions(&self) -> Gd<FighterHistoryItem> {
         Gd::from_object(self.input_history.pressed_actions_for_godot())
@@ -139,7 +152,7 @@ impl FighterInput {
         }
     }
 
-    /* fn log_input_state(&self) {
+    fn log_input_state(&self) {
         let mut log_string = String::from("\n \nMovement: ");
 
         log_string += &self.frame_input_state.movement;
@@ -160,5 +173,5 @@ impl FighterInput {
         log_string += "}";
 
         godot_print!("{}", log_string);
-    } */
+    }
 }

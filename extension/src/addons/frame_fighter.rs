@@ -32,9 +32,7 @@ impl FrameFighter {
     pub fn is_movement(name: &str) -> bool {
         matches!(
             name,
-            "up" | "down" | "back" | "forward"
-                | "up_forward" | "up_back"
-                | "down_forward" | "down_back"
+            "up" | "down" | "back" | "forward" | "up_forward" | "up_back" | "down_forward" | "down_back"
         )
     }
 }

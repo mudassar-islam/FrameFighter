@@ -4,6 +4,9 @@ use godot::prelude::*;
 #[class(tool, init, base=Resource)]
 pub struct FighterMoveList {
     #[export]
+    frame_buffer: i32,
+
+    #[export]
     moves: Array<Gd<FighterMove>>,
     base: Base<Resource>,
 }
@@ -21,7 +24,7 @@ pub struct FighterMove {
     sequence: Array<GString>,
 
     #[export]
-    modifiers: Array<i32>,
+    modifiers: Array<i64>,
 
     #[export]
     frame_buffer: i32

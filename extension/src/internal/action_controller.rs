@@ -4,6 +4,8 @@ use indexmap::IndexMap;
 
 use crate::addons::frame_fighter::FrameFighter;
 
+const MAX_FRAMES: u32 = 9999;
+
 pub enum ActionType {
     Basic {
         input_action: String,
@@ -51,17 +53,17 @@ pub struct FrameInputState {
     pub movement: String,
     pub basic_actions: Vec<String>,
     pub composite_actions: Vec<String>,
-    pub all_actions: String,
+    pub all: String,
     pub charge: HashMap<String, u32>,
 }
 
 impl FrameInputState {
-    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, all_actions: impl Into<String>, charge: HashMap<String, u32>) -> Self {
+    pub fn new(movement: impl Into<String>, basic_actions: Vec<impl Into<String>>, composite_actions: Vec<impl Into<String>>, all: impl Into<String>, charge: HashMap<String, u32>) -> Self {
         Self {
             movement: movement.into(),
             basic_actions: basic_actions.into_iter().map(|a| a.into()).collect(),
             composite_actions: composite_actions.into_iter().map(|a| a.into()).collect(),
-            all_actions: all_actions.into(),
+            all: all.into(),
             charge
         }
     }
@@ -241,9 +243,9 @@ impl ActionController {
                 match charge {
                     Some(frames) => {
                         if action.pressed && self.can_charge {
-                            *frames = (*frames + 1).clamp(0, 9999);
+                            *frames = (*frames + 1).clamp(0, MAX_FRAMES);
                         } else if action.charge_type == FrameFighter::CHARGE_TICK {
-                            *frames = (*frames - 1).clamp(0, 9999);
+                            *frames = (*frames - 1).clamp(0, MAX_FRAMES);
                         } else {
                             *frames = 0;
                         }

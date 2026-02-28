@@ -46,7 +46,7 @@ impl InputHistory {
 
     pub fn add(&mut self, state: &FrameInputState) {
         // Increment the latest entry's frames if input signature is the same;
-        if let Some(previous) = self.entries.first_mut() && previous.all == state.all_actions {
+        if let Some(previous) = self.entries.first_mut() && previous.all == state.all {
             previous.frames = (previous.frames + 1).clamp(0, self.max_frames);
             previous.charge = state.charge.clone();
             return;
@@ -57,7 +57,7 @@ impl InputHistory {
             state.movement.clone(),
             state.basic_actions.clone(),
             state.composite_actions.clone(),
-            &state.all_actions.clone(),
+            &state.all.clone(),
             state.charge.clone()
         ));
 
