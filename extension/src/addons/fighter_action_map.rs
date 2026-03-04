@@ -5,7 +5,7 @@ use godot::prelude::*;
 /// A resource that tells the [FighterInput] node how to evaluate player input.
 ///
 /// Set the corresponding **Input Map Action** for every action your game requires.
-/// The movement actions are pre-set only require the **Input Map Action** name, however other actions can be created manually and be tailored specifically to your project's needs.
+/// The movement actions are pre-set & only require the **Input Map Action** name, however other actions can be created manually and be tailored specifically to your project's needs.
 ///
 /// **Note:** All movement actions can be charged.
 pub struct FighterActionMap {
@@ -31,12 +31,7 @@ pub struct FighterActionMap {
 
     /// Array of custom [FighterCompositeAction]s
     #[export]
-    pub composite_actions: Array<Gd<FighterCompositeAction>>,
-
-    #[export(range = (0.0, 60.0, or_greater))]
-    pub charge_requirement: i32,
-
-    base: Base<Resource>,
+    pub composite_actions: Array<Gd<FighterCompositeAction>>
 }
 
 #[derive(GodotClass)]
@@ -53,7 +48,7 @@ pub struct FighterAction {
 
     /// What type of charge action uses. Cannot be charged by default.
     #[export(enum = (None = 0, Immediate = 1, Tick = 2))]
-    pub charge_type: i32
+    pub charge_type: u32
 }
 
 #[derive(GodotClass)]
@@ -76,5 +71,5 @@ pub struct FighterCompositeAction {
 
     /// What type of charge action uses. Cannot be charged by default.
     #[export(enum = (None = 0, Immediate = 1, Tick = 2))]
-    pub charge_type: i32
+    pub charge_type: u32
 }

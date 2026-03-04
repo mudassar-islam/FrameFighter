@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use crate::{addons::fighter_history::FighterHistoryItem, internal::action_controller::FrameInputState};
 
+#[derive(Clone)]
 pub struct HistoryItem {
     pub frames: u32,
     pub movement: String,
@@ -29,10 +30,11 @@ impl HistoryItem {
     }
 }
 
+#[derive(Clone)]
 pub struct InputHistory {
-    size: usize,
-    max_frames: u32,
-    entries: Vec<HistoryItem>
+    pub size: usize,
+    pub max_frames: u32,
+    pub entries: Vec<HistoryItem>
 }
 
 impl InputHistory {

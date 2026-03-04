@@ -1,11 +1,67 @@
-[gd_scene load_steps=3 format=3 uid="uid://m5gmdljnywwj"]
+[gd_scene load_steps=12 format=3 uid="uid://m5gmdljnywwj"]
 
 [ext_resource type="Script" uid="uid://ds7545maafhe8" path="res://scenes/playground.gd" id="1_hddm4"]
 [ext_resource type="FighterActionMap" uid="uid://d2kfojuwd2c5a" path="res://resources/fighter_action_map.tres" id="2_qchbg"]
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_kddj0"]
+movement = "down"
+input_window = 6
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_q8s1k"]
+movement = "down_forward"
+modifiers = Array[int]([2])
+input_window = 6
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_mm0a5"]
+movement = "forward"
+actions = Array[String](["lp"])
+modifiers = Array[int]([1])
+input_window = 6
+
+[sub_resource type="FighterMove" id="FighterMove_emj6c"]
+name = "hado"
+priority = 35
+sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_kddj0"), SubResource("FighterSequenceStep_q8s1k"), SubResource("FighterSequenceStep_mm0a5")])
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_qchbg"]
+movement = "forward"
+input_window = 6
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_o6wi6"]
+movement = "down"
+input_window = 6
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_emj6c"]
+movement = "down_forward"
+actions = Array[String](["lp"])
+
+[sub_resource type="FighterMove" id="FighterMove_mrac1"]
+name = "dp"
+priority = 30
+sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_qchbg"), SubResource("FighterSequenceStep_o6wi6"), SubResource("FighterSequenceStep_emj6c")])
+
+[sub_resource type="FighterMoveList" id="FighterMoveList_qchbg"]
+moves = Array[FighterMove]([SubResource("FighterMove_emj6c"), SubResource("FighterMove_mrac1")])
 
 [node name="Playground" type="Node2D"]
 script = ExtResource("1_hddm4")
 
 [node name="FighterInput" type="FighterInput" parent="."]
-history_frames = 99
 action_map = ExtResource("2_qchbg")
+move_list = SubResource("FighterMoveList_qchbg")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Moves" type="Label" parent="HUD"]
+offset_left = 960.0
+offset_top = 32.0
+offset_right = 1000.0
+offset_bottom = 55.0
+text = "Test"
+
+[node name="History" type="Label" parent="HUD"]
+offset_left = 24.0
+offset_top = 32.0
+offset_right = 64.0
+offset_bottom = 55.0
+text = "Test"

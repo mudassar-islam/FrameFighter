@@ -8,23 +8,23 @@ use crate::internal::input_history::HistoryItem;
 pub struct FighterHistoryItem {
     /// Number of frames the current actions were held for.
     #[var]
-    frames: u32,
+    pub frames: u32,
 
     /// The active movement action.
     #[var]
-    movement: GString,
+    pub movement: GString,
 
     /// Array of active basic actions.
     #[var]
-    basic_actions: Array<GString>,
+    pub basic_actions: Array<GString>,
 
     /// Array of active basic actions.
     #[var]
-    composite_actions: Array<GString>,
+    pub composite_actions: Array<GString>,
 
     /// Dictionary of chargeable actions and how long they've been pressed for.
     #[var]
-    charge: VarDictionary
+    pub charge: VarDictionary,
 }
 
 #[godot_api]
@@ -59,7 +59,7 @@ impl FighterHistoryItem {
     #[func]
     pub fn get_charge_frames(&self, action: GString) -> Variant {
         if let Some(charge) = self.charge.get(action) {
-            return charge
+            return charge;
         }
 
         godot_script_error!("Charge Key not found.");
@@ -77,4 +77,15 @@ impl Default for FighterHistoryItem {
             charge: vdict! {}
         }
     }
+}
+
+#[derive(GodotClass)]
+#[class(init, base=Object)]
+pub struct FighterMatchedMove {
+    #[var]
+    pub name: GString,
+    #[var]
+    pub perfect_input: bool,
+    #[var]
+    pub total_frames: u32
 }
