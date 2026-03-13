@@ -4,9 +4,11 @@ use crate::addons::fighter_history::{FighterHistoryItem, FighterMatchedMove};
 use crate::addons::frame_fighter::FrameFighter;
 use crate::addons::fighter_action_map::FighterActionMap;
 use crate::addons::fighter_move_list::FighterMoveList;
-use crate::internal::action_controller::{ActionController, FrameInputState};
+use crate::internal::action_controller::ActionController;
 use crate::internal::input_history::InputHistory;
-use crate::internal::move_matcher::{MoveMatcher, SequenceStep};
+use crate::internal::models::frame_input_state::FrameInputState;
+use crate::internal::models::sequence_step::SequenceStep;
+use crate::internal::move_matcher::MoveMatcher;
 
 #[derive(GodotClass)]
 #[class(tool, init, base=Node)]
@@ -81,7 +83,6 @@ impl FighterInput {
         self.action_controller.handle_side(self.side);
         self.action_controller.set_can_charge(self.can_charge);
         self.action_controller.process_frame();
-
         self.frame_input_state = self.action_controller.get_frame_state();
 
         self.input_history.add(&self.frame_input_state);
@@ -141,8 +142,10 @@ impl FighterInput {
                     self.move_matcher.add_move(
                         fighter_move.name.to_string(),
                         steps,
+                        fighter_move.require_neutrals,
                         fighter_move.require_charge,
-                        fighter_move.charge_frames
+                        fighter_move.charge_frames,
+                        fighter_move.priority
                     );
                 }
 

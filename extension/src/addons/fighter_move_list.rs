@@ -26,6 +26,10 @@ pub struct FighterMove {
     /// The priority for this move. Determines which move is activated if multiple moves are matched on the same frame. Lower number means higher priority.
     pub priority: i32,
 
+    #[export]
+    /// Whether this move requires neutrals. Usually you should keep this off unless necessary for a specific move. #[export]
+    pub require_neutrals: bool,
+
     /// Whether the first input for this move requires charge.
     #[export]
     pub require_charge: bool,

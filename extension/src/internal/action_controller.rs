@@ -2,60 +2,9 @@ use std::collections::HashMap;
 use godot::{classes::Input, global::{godot_error}, obj::Singleton};
 use indexmap::IndexMap;
 
-use crate::addons::frame_fighter::FrameFighter;
+use crate::{addons::frame_fighter::FrameFighter, internal::models::{action::{Action, ActionType}, frame_input_state::FrameInputState}};
 
 const MAX_CHARGE_FRAMES: u32 = 99;
-
-pub enum ActionType {
-    Basic {
-        input_action: String,
-        is_dependency: bool
-    },
-
-    Composite {
-        dependencies: Vec<String>,
-        require_all: bool
-    }
-}
-
-pub struct Action {
-    pressed: bool,
-    charge_type: u32,
-    action_type: ActionType
-}
-
-impl Action {
-    pub fn basic(input_action: impl Into<String>, charge_type: u32) -> Self {
-        Self {
-            pressed: false,
-            charge_type,
-            action_type: ActionType::Basic {
-                input_action: input_action.into(),
-                is_dependency: false
-            }
-        }
-    }
-
-    pub fn composite(dependencies: Vec<impl Into<String>>, charge_type: u32, require_all: bool) -> Self {
-        Self {
-            pressed: false,
-            charge_type,
-            action_type: ActionType::Composite {
-                dependencies: dependencies.into_iter().map(|d| d.into()).collect(),
-                require_all
-            }
-        }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct FrameInputState {
-    pub movement: String,
-    pub basic_actions: Vec<String>,
-    pub composite_actions: Vec<String>,
-    pub all: String,
-    pub charge: HashMap<String, u32>,
-}
 
 pub struct ActionController {
     side: u32,

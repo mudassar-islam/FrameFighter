@@ -45,4 +45,23 @@ impl FrameFighter {
             "up" | "down" | "back" | "forward"
         )
     }
+
+    // For a given transition between cardinal to a diagonal, it gives you the expected ending direction for the sequence.
+    // For example, if a move goes from down to down_forward, the next expected input is forward.
+    pub fn expected_ender(dir_a: &str, dir_b: &str) -> String {
+        match (dir_a, dir_b) {
+            ("down", "down_forward") => "forward".to_string(),
+            ("down", "down_back") => "back".to_string(),
+
+            ("up", "up_forward") => "forward".to_string(),
+            ("up", "up_back") => "back".to_string(),
+
+            ("forward", "down_forward") => "down".to_string(),
+            ("forward", "up_forward") => "up".to_string(),
+
+            ("back", "down_back") => "down".to_string(),
+            ("back", "up_back") => "up".to_string(),
+            _ => "neutral".to_string()
+        }
+    }
 }

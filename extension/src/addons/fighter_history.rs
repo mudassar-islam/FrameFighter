@@ -1,6 +1,6 @@
 use godot::prelude::*;
 
-use crate::internal::input_history::HistoryItem;
+use crate::internal::models::history_item::HistoryItem;
 
 #[derive(GodotClass)]
 #[class(init, base=Object)]
@@ -87,5 +87,7 @@ pub struct FighterMatchedMove {
     #[var]
     pub perfect_input: bool,
     #[var]
-    pub total_frames: u32
+    pub total_frames: u32,
+    #[var]
+    pub priority: i32
 }

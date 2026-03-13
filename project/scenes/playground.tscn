@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://m5gmdljnywwj"]
+[gd_scene load_steps=19 format=3 uid="uid://m5gmdljnywwj"]
 
 [ext_resource type="Script" uid="uid://ds7545maafhe8" path="res://scenes/playground.gd" id="1_hddm4"]
 [ext_resource type="FighterActionMap" uid="uid://d2kfojuwd2c5a" path="res://resources/fighter_action_map.tres" id="2_qchbg"]
@@ -20,28 +20,61 @@ input_window = 6
 
 [sub_resource type="FighterMove" id="FighterMove_emj6c"]
 name = "hado"
-priority = 35
+priority = 2
 sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_kddj0"), SubResource("FighterSequenceStep_q8s1k"), SubResource("FighterSequenceStep_mm0a5")])
 
 [sub_resource type="FighterSequenceStep" id="FighterSequenceStep_qchbg"]
-movement = "forward"
-input_window = 6
-
-[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_o6wi6"]
 movement = "down"
 input_window = 6
 
-[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_emj6c"]
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_o6wi6"]
 movement = "down_forward"
-actions = Array[String](["lp"])
+input_window = 6
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_emj6c"]
+movement = "forward"
+actions = Array[String](["ex_p"])
+modifiers = Array[int]([1])
+input_window = 6
 
 [sub_resource type="FighterMove" id="FighterMove_mrac1"]
-name = "dp"
-priority = 30
+name = "ex_hado"
+priority = 1
 sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_qchbg"), SubResource("FighterSequenceStep_o6wi6"), SubResource("FighterSequenceStep_emj6c")])
 
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_mrac1"]
+movement = "forward"
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_2q4k0"]
+movement = "down"
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_x1amm"]
+movement = "down_forward"
+actions = Array[String](["lp"])
+modifiers = Array[int]([1])
+
+[sub_resource type="FighterMove" id="FighterMove_2bfhc"]
+name = "dp"
+priority = 1
+sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_mrac1"), SubResource("FighterSequenceStep_2q4k0"), SubResource("FighterSequenceStep_x1amm")])
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_2bfhc"]
+movement = "back"
+
+[sub_resource type="FighterSequenceStep" id="FighterSequenceStep_osidk"]
+movement = "forward"
+actions = Array[String](["lp"])
+modifiers = Array[int]([1])
+
+[sub_resource type="FighterMove" id="FighterMove_rlvb3"]
+name = "sonicboom"
+priority = 1
+require_charge = true
+charge_frames = 8
+sequence = Array[FighterSequenceStep]([SubResource("FighterSequenceStep_2bfhc"), SubResource("FighterSequenceStep_osidk")])
+
 [sub_resource type="FighterMoveList" id="FighterMoveList_qchbg"]
-moves = Array[FighterMove]([SubResource("FighterMove_emj6c"), SubResource("FighterMove_mrac1")])
+moves = Array[FighterMove]([SubResource("FighterMove_emj6c"), SubResource("FighterMove_mrac1"), SubResource("FighterMove_2bfhc"), SubResource("FighterMove_rlvb3")])
 
 [node name="Playground" type="Node2D"]
 script = ExtResource("1_hddm4")

@@ -2,10 +2,10 @@
 
 # FrameFighter
 
-An input processor for fighting games in the [Godot Game Engine](https://godotengine.org/) that handles input buffers, input histories, sequence matching with per-move customization, side switching & charge moves. Made in Rust using GDExtension and [godot-rust](https://godot-rust.github.io/).
+An input processor for fighting games in the [Godot Game Engine](https://godotengine.org/). Made in Rust using GDExtension and [godot-rust](https://godot-rust.github.io/).
 
 > [!IMPORTANT]
-> This addon deals only with input processing needs for a fighting game. This is intended to be used within a larger project to handle user-input only.
+> This addon deals only with input processing needs for a fighting game. This is intended to be used within a larger project to handle user-input only. For a complete fighting-games toolkit, check out [Castagne Engine](https://castagneengine.com/).
 
 ## Feature Status
 
@@ -13,6 +13,7 @@ An input processor for fighting games in the [Godot Game Engine](https://godoten
 - [x] Basic Actions i.e. Buttons on an arcade stick.
 - [x] Composite Actions i.e. hold 2 punches for an EX Punch or Parry.
 - [x] Movement with side switching & SOCD cleaning.
+- [x] Input history tracking. 
 - [x] Sequence Matching for moves.
 - - [x] Per move modifiers for allowing/preventing leniency.
 - - [ ] Charge Moves

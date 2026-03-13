@@ -17,7 +17,7 @@ var accum = 0;
 func _physics_process(_delta: float) -> void:
 	accum += _delta
 
-	# if accum >= 0.015:
+	#if accum >= 0.015:
 	if accum >= 0.25:
 		var actions = fighterInput.process_frame()
 		var moves = fighterInput.matched_moves()

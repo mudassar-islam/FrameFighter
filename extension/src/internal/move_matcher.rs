@@ -1,25 +1,23 @@
-use std::{collections::HashMap, hash::Hash};
-
 use godot::prelude::*;
 use indexmap::IndexMap;
 
 use crate::{
     addons::{fighter_history::FighterMatchedMove, frame_fighter::FrameFighter},
-    internal::action_controller::FrameInputState,
+    internal::models::{frame_input_state::FrameInputState, history_item::HistoryItem, move_def::{MatchedMove, Move}, sequence_step::SequenceStep}
 };
 
 #[derive(PartialEq)]
 enum StepResult {
-    INVALID,
-    PERFECT,
-    TWO_STEP,
-    THREE_STEP,
-    MISS,
+    Invalid,
+    Perfect,
+    TwoStep,
+    ThreeStep
 }
 
 pub struct MoveMatcher {
     matched_moves: Vec<MatchedMove>,
-    buffer: Vec<BufferItem>,
+    buffer: Vec<HistoryItem>,
+    buffer_stripped: Vec<HistoryItem>,
     size: usize,
     max_frames: u32,
     moves: IndexMap<String, Move>,
@@ -30,15 +28,18 @@ impl MoveMatcher {
         &mut self,
         name: impl Into<String>,
         sequence: Vec<SequenceStep>,
+        require_neutrals: bool,
         require_charge: bool,
         charge_frames: u32,
+        priority: i32
     ) {
         self.moves.insert(
             name.into(),
-            Move::new(sequence, require_charge, charge_frames),
+            Move::new(sequence, require_neutrals, require_charge, charge_frames, priority),
         );
     }
 
+    // Sort moves with longest sequence first.
     pub fn sort_moves(&mut self) {
         self.moves
             .sort_by(|_, m1, _, m2| m2.reversed_sequence.len().cmp(&m1.reversed_sequence.len()));
@@ -50,18 +51,20 @@ impl MoveMatcher {
                 name: GString::from(&m.name),
                 total_frames: m.total_frames,
                 perfect_input: m.perfect_input,
+                priority: m.priority
             })
         }))
     }
 
     pub fn process_frame(&mut self) {
-        self.matched_moves = vec![];
+        self.matched_moves.clear();
 
         for (name, move_def) in &self.moves {
             let (success, perfect_input, total_frames) = self.match_move(move_def);
             if success {
                 self.matched_moves.push(MatchedMove {
                     name: name.to_string(),
+                    priority: move_def.priority,
                     perfect_input,
                     total_frames,
                 });
@@ -69,59 +72,84 @@ impl MoveMatcher {
         }
 
         if self.matched_moves.len() > 0 {
-            self.buffer.clear();
+            self.matched_moves.sort_by(|m1, m2| m1.priority.cmp(&m2.priority));
+            self.clear_buffers();
         }
+    }
+
+    fn clear_buffers(&mut self) {
+        self.buffer.clear();
+        self.buffer_stripped.clear();
     }
 
     fn match_move(&self, move_def: &Move) -> (bool, bool, u32) {
         let seq = &move_def.reversed_sequence;
-        let buf = &self.buffer;
+        let buf = match move_def.require_neutrals {
+            true => &self.buffer,
+            false => &self.buffer_stripped
+        };
 
-        if seq.is_empty() || buf.is_empty() {
+        if seq.is_empty() || buf.is_empty() || buf.len() < seq.len() {
             return (false, false, 0);
         }
 
         let mut buf_idx = 0;
-        let mut found = 0;
-        let mut total_frames = 0;
+        let mut matches = 0;
         let mut perfect_input = true;
+        let mut total_frames = 0;
 
         'attempt: for (step_idx, step) in seq.iter().enumerate() {
-            let is_last_step = step_idx == 0;
+            let mut step_frames = 0;
+            let mut step_matched = false;
 
             while buf_idx < buf.len() {
-                let input = &buf[buf_idx];
-                total_frames += input.frames;
+                let current = &buf[buf_idx];
+
+                // Only count frames if not the first input. Because the first input can be held for as long as possible.
+                if step_idx != seq.len() - 1 {
+                    step_frames += current.frames;
+                }
 
                 let result =
-                    self.satisfies_step(move_def, step, input, false, 0, is_last_step, buf_idx);
+                    self.satisfies_step(move_def, step, current, step_idx, buf_idx);
 
-                if result == StepResult::INVALID {
+                if result == StepResult::Invalid {
                     break 'attempt;
                 }
 
-                found += 1;
                 buf_idx += 1;
 
                 match result {
-                    StepResult::TWO_STEP => {
+                    StepResult::TwoStep => {
+                        self.print_buffers();
+
+                        step_frames += &buf[buf_idx + 1].frames;
+                        perfect_input = false;
                         buf_idx += 1;
-                        total_frames += &buf[buf_idx + 1].frames;
-                        perfect_input = false;
                     },
-                    StepResult::THREE_STEP => {
-                        buf_idx += 2;
-                        total_frames += &buf[buf_idx + 1].frames;
-                        total_frames += &buf[buf_idx + 2].frames;
+                    StepResult::ThreeStep => {
+                        self.print_buffers();
+
+                        step_frames += &buf[buf_idx + 1].frames;
+                        step_frames += &buf[buf_idx + 2].frames;
                         perfect_input = false;
+                        buf_idx += 2;
                     },
                     _ => ()
                 };
 
+                step_matched = true;
+
                 break;
             }
 
-            if found == seq.len() {
+            total_frames += step_frames;
+
+            if step_matched && step_frames <= step.input_window {
+                matches += 1;
+            }
+
+            if matches == seq.len() {
                 return (true, perfect_input, total_frames);
             }
         }
@@ -129,91 +157,35 @@ impl MoveMatcher {
         return (false, false, 0);
     }
 
-    /* fn match_move(&self, move_def: &Move) -> (bool, bool, u32) {
-        let seq = &move_def.reversed_sequence;
-        let buffer = &self.buffer;
-
-        if seq.is_empty() || buffer.is_empty() {
-            return (false, false, 0);
-        }
-
-        let mut buf_idx = 0;
-        let mut total_frames: u32 = 0;
-        let mut perfect_input = true;
-
-        for (step_idx, step) in seq.iter().enumerate() {
-            // Whether the current step requires charge, or whether it is the last step.
-            // The order of the sequence is reversed so 0 = last, len() - 1 = first
-            let is_charge_step = move_def.require_charge && step_idx == seq.len() - 1;
-            let is_last_step = step_idx == 0;
-
-            let mut found = false;
-            let mut window_frames: u32 = 0;
-            let scan_start = buf_idx;
-
-            /* if !FrameFighter::is_cardinal(&step.movement) && step.modifiers.contains(&FrameFighter::IGNORE_DIAGONAL) && step.actions.len() == 0 {
-                continue;
-            } */
-
-            while buf_idx < buffer.len() {
-                let input = &buffer[buf_idx];
-
-                let result = self.satisfies_step(move_def, step, input, is_charge_step, move_def.charge_frames, is_last_step, buf_idx);
-
-                if result == StepResult::INVALID {
-                    break;
-                }
-
-                if result == StepResult::MISS {
-                    // This entry didn't match. Consume its frames against the window.
-                    window_frames += input.frames;
-
-                    // The first step has no "previous anchor" so we treat its input_window
-                    // as a recency gate: how recently must the final input have occurred?
-                    if window_frames >= step.input_window && !is_charge_step {
-                        break; // Window expired, move attempt fails
-                    }
-
-                    buf_idx += 1;
-                }
-
-                if result == StepResult::PERFECT || result == StepResult::TWO_STEP {
-                    if buf_idx > scan_start {
-                        // Had to skip buffer entries to find a match — not a perfect input
-                        perfect_input = false;
-                    }
-
-                    total_frames = (total_frames + (window_frames + input.frames)).clamp(1, self.max_frames);
-                    found = true;
-
-                    buf_idx += 1;
-                    if result == StepResult::TWO_STEP {
-                        buf_idx += 1;
-                    }
-
-                    break;
-                }
-            }
-
-            if !found {
-                return (false, false, 0);
-            }
-        }
-
-        (true, perfect_input, total_frames)
-    } */
-
     fn satisfies_step(
         &self,
         move_def: &Move,
         step: &SequenceStep,
-        current: &BufferItem,
-        is_charge_step: bool,
-        charge_frames: u32,
-        is_last_step: bool,
+        current: &HistoryItem,
+        step_idx: usize,
         buf_idx: usize,
     ) -> StepResult {
-        let mut result = StepResult::PERFECT;
+        let is_first_step = step_idx == move_def.reversed_sequence.len() - 1;
+        let is_last_step = step_idx == 0;
+
+        let mut result = StepResult::Perfect;
+
+        if move_def.require_charge {
+            let (movement, actions) = (
+                MoveMatcher::charge_movement_match(current, step),
+                MoveMatcher::actions_match(current, step)
+            );
+
+            if is_first_step && let Some(charge) = current.charge.get(&step.movement) && *charge < move_def.charge_frames {
+                result = StepResult::Invalid;
+            }
+
+            if !movement || !actions {
+                result = StepResult::Invalid;
+            }
+
+            return result;
+        }
 
         let (movement, actions) = (
             MoveMatcher::strict_movement_match(current, step),
@@ -221,27 +193,27 @@ impl MoveMatcher {
         );
 
         if !movement || !actions {
-            result = StepResult::INVALID;
+            result = StepResult::Invalid;
         }
 
-        let previous_a = self.buffer.get(buf_idx + 1);
-        let previous_b = self.buffer.get(buf_idx + 2);
+        let prev_a = self.buffer.get(buf_idx + 1);
+        let prev_b = self.buffer.get(buf_idx + 2);
 
-        if let Some(previous_a) = previous_a
+        if let Some(prev_a) = prev_a
             && is_last_step
             && step.modifiers.contains(&FrameFighter::LENIENT_ENDER)
             && actions
         {
-            if MoveMatcher::lenient_movement_match(previous_a, step)
+            if MoveMatcher::lenient_movement_match(prev_a, step)
                 && (MoveMatcher::neutral_movement(current) || movement)
             {
-                result = StepResult::TWO_STEP;
-            } else if let Some(previous_b) = previous_b
-                && MoveMatcher::lenient_movement_match(previous_b, step)
-                && (MoveMatcher::neutral_movement(previous_a) || MoveMatcher::lenient_movement_match(previous_a, step))
+                result = StepResult::TwoStep;
+            } else if let Some(prev_b) = prev_b
+                && MoveMatcher::lenient_movement_match(prev_b, step)
+                && (MoveMatcher::neutral_movement(prev_a) || MoveMatcher::lenient_movement_match(prev_a, step))
                 && (MoveMatcher::neutral_movement(current))
             {
-                result = StepResult::THREE_STEP;
+                result = StepResult::ThreeStep;
             }
         }
 
@@ -271,11 +243,47 @@ impl MoveMatcher {
         result
     }
 
-    fn strict_movement_match(input: &BufferItem, step: &SequenceStep) -> bool {
+    fn print_buffers(&self) {
+        let mut buf: Vec<String> = vec![];
+        let mut buf_stripped: Vec<String> = vec![];
+
+        for item in self.buffer.iter() {
+            let mut st = "{".to_string();
+
+            st.push_str(&item.movement.to_string());
+            st.push_str(".");
+            st.push_str(&item.basic_actions.join(","));
+            st.push_str("}");
+
+            buf.push(st);
+        }
+
+        for item in self.buffer_stripped.iter() {
+            let mut st = "{".to_string();
+
+            st.push_str(&item.movement.to_string());
+            st.push_str(".");
+            st.push_str(&item.basic_actions.join(","));
+            st.push_str("}");
+
+            buf_stripped.push(st);
+        }
+
+        godot_print!("Standard: [ {} ]", buf.join(" | "));
+        godot_print!("Stripped: [ {} ]", buf_stripped.join(" | "));
+    }
+
+    fn strict_movement_match(input: &HistoryItem, step: &SequenceStep) -> bool {
         step.movement.is_empty() || step.movement == input.movement
     }
 
-    fn lenient_movement_match(input: &BufferItem, step: &SequenceStep) -> bool {
+    // For charge moves, we only wanna check if the cardinal direction exists.
+    // ⇐⇒(B) : Should still be triggered with ⇙⇘(B)
+    fn charge_movement_match(input: &HistoryItem, step: &SequenceStep) -> bool {
+        step.movement.is_empty() || input.movement.contains(&step.movement)
+    }
+
+    fn lenient_movement_match(input: &HistoryItem, step: &SequenceStep) -> bool {
         /* if !FrameFighter::is_cardinal(&step.movement) {
 
         } */
@@ -283,23 +291,23 @@ impl MoveMatcher {
         step.movement.is_empty() || step.movement == input.movement
     }
 
-    fn neutral_movement(input: &BufferItem) -> bool {
+    fn neutral_movement(input: &HistoryItem) -> bool {
         input.movement == "neutral"
     }
 
-    /* fn cardinal_match(input: &BufferItem, step: &SequenceStep) -> bool {
+    /* fn cardinal_match(input: &HistoryItem, step: &SequenceStep) -> bool {
         step.movement.is_empty()
         || input.movement.contains(&step.movement)
         || !input.movement.contains("_")
     } */
 
-    fn actions_match(input: &BufferItem, step: &SequenceStep) -> bool {
-        godot_print!("Step: {} - {}", step.movement, step.actions.join("."));
+    fn actions_match(input: &HistoryItem, step: &SequenceStep) -> bool {
+        /* godot_print!("Step: {} - {}", step.movement, step.actions.join("."));
         godot_print!(
             "Input: {} - {}\n",
             input.movement,
             input.basic_actions.join(".")
-        );
+        ); */
 
         match step.actions.len() {
             0 => input.basic_actions.len() + input.composite_actions.len() == 0,
@@ -326,22 +334,35 @@ impl MoveMatcher {
         {
             previous.frames = (previous.frames + 1).clamp(0, self.max_frames);
             previous.charge = state.charge.clone();
+
+            // Add the current entry's frames to the last non-empty input in-case it's the same signature.
+            if let Some(previous_stripped) = self.buffer_stripped.first_mut() {
+                previous_stripped.frames = (previous_stripped.frames + 1).clamp(0, self.max_frames);
+                previous_stripped.charge = state.charge.clone();
+            }
+
             return;
         }
 
         // Otherwise insert a new entry
         self.buffer.insert(
             0,
-            BufferItem::new(
+            HistoryItem::new(
                 state.movement.clone(),
                 state.basic_actions.clone(),
                 state.composite_actions.clone(),
-                state.charge.clone(),
                 state.all.clone(),
+                state.charge.clone(),
             ),
         );
 
+        // If it's not an empty input, we add it to the stripped buffer.
+        if !(state.movement == "neutral" && state.basic_actions.len() + state.composite_actions.len() == 0) && let Some(prev) = self.buffer.first() {
+            self.buffer_stripped.insert(0, prev.clone());
+        }
+
         self.buffer.truncate(self.size);
+        self.buffer_stripped.truncate(self.size);
     }
 }
 
@@ -353,83 +374,7 @@ impl Default for MoveMatcher {
             max_frames: 999,
             moves: IndexMap::new(),
             buffer: vec![],
+            buffer_stripped: vec![],
         }
     }
-}
-#[derive(Clone)]
-pub struct BufferItem {
-    pub frames: u32,
-    pub movement: String,
-    pub basic_actions: Vec<String>,
-    pub composite_actions: Vec<String>,
-    pub charge: HashMap<String, u32>,
-    pub all: String,
-}
-
-impl BufferItem {
-    pub fn new(
-        movement: impl Into<String>,
-        basic_actions: Vec<String>,
-        composite_actions: Vec<String>,
-        charge: HashMap<String, u32>,
-        all: impl Into<String>,
-    ) -> Self {
-        Self {
-            frames: 1,
-            movement: movement.into(),
-            basic_actions,
-            composite_actions,
-            charge,
-            all: all.into(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct SequenceStep {
-    pub movement: String,
-    pub actions: Vec<String>,
-    pub input_window: u32,
-    pub modifiers: Vec<u32>,
-}
-
-impl SequenceStep {
-    pub fn new(
-        movement: impl Into<String>,
-        actions: Vec<impl Into<String>>,
-        input_window: u32,
-        modifiers: Vec<u32>,
-    ) -> Self {
-        Self {
-            movement: movement.into(),
-            actions: actions.into_iter().map(|a| a.into()).collect(),
-            input_window,
-            modifiers,
-        }
-    }
-}
-
-pub struct Move {
-    pub reversed_sequence: Vec<SequenceStep>,
-    pub require_charge: bool,
-    pub charge_frames: u32,
-}
-
-impl Move {
-    pub fn new(sequence: Vec<SequenceStep>, require_charge: bool, charge_frames: u32) -> Self {
-        let mut reversed_sequence = sequence.clone();
-        reversed_sequence.reverse();
-
-        Self {
-            reversed_sequence,
-            require_charge,
-            charge_frames,
-        }
-    }
-}
-
-pub struct MatchedMove {
-    pub name: String,
-    pub total_frames: u32,
-    pub perfect_input: bool,
 }
